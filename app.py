@@ -1,42 +1,39 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import requests
-import os
-
 from config import API_KEY, BASE_URL
+import os
 
 app = Flask(__name__)
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/weather', methods=['POST'])
 def weather():
-    city = request.json.get('city')
-    if not city:
-        return jsonify({"error": "City is required"}), 400
+    city = request.form['city']
+    params = {
+        'key': API_KEY,
+        'q': city
+    }
 
-    params = {"key": API_KEY, "q": city}
-    try:
-        response = requests.get(BASE_URL, params=params)
-        data = response.json()
+    response = requests.get(BASE_URL, params=params)
+    data = response.json()
 
-        if "error" in data:
-            return jsonify({"error": data["error"]["message"]}), 404
-
+    if response.status_code == 200 and "current" in data:
         weather_data = {
-            "location": data["location"]["name"],
-            "temperature": data["current"]["temp_c"],
-            "condition": data["current"]["condition"]["text"],
-            "icon": "http:" + data["current"]["condition"]["icon"],
-            "humidity": data["current"]["humidity"],
-            "wind": data["current"]["wind_kph"]
+            'city': data['location']['name'],
+            'country': data['location']['country'],
+            'temp_c': data['current']['temp_c'],
+            'condition': data['current']['condition']['text'],
+            'icon': data['current']['condition']['icon']
         }
-        return jsonify(weather_data)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return render_template('result.html', weather=weather_data)
+    else:
+        error_msg = data.get("error", {}).get("message", "City not found.")
+        return render_template('index.html', error=error_msg)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
